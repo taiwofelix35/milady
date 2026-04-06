@@ -5,11 +5,12 @@ import { MOCK_COLLECTIONS, MOCK_NFTS } from '@/lib/mockData'
 import type { Metadata } from 'next'
 
 interface PageProps {
-  params: { slug: string }
+  params: Promise<{ slug: string }>
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const collection = MOCK_COLLECTIONS.find((c) => c.slug === params.slug)
+  const { slug } = await params
+  const collection = MOCK_COLLECTIONS.find((c) => c.slug === slug)
   if (!collection) return { title: 'Collection Not Found' }
   return {
     title: `${collection.name} — Milady Market`,
@@ -17,8 +18,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-export default function CollectionPage({ params }: PageProps) {
-  const collection = MOCK_COLLECTIONS.find((c) => c.slug === params.slug)
+export default async function CollectionPage({ params }: PageProps) {
+  const { slug } = await params
+  const collection = MOCK_COLLECTIONS.find((c) => c.slug === slug)
   if (!collection) notFound()
 
   const nfts = MOCK_NFTS.filter(

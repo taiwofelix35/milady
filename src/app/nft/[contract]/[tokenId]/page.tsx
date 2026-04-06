@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { use, useState } from 'react'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -11,14 +11,15 @@ import { MOCK_NFTS } from '@/lib/mockData'
 import { shortenAddress } from '@/lib/seaport'
 
 interface PageProps {
-  params: { contract: string; tokenId: string }
+  params: Promise<{ contract: string; tokenId: string }>
 }
 
 export default function NFTDetailPage({ params }: PageProps) {
+  const { contract, tokenId } = use(params)
   const nft = MOCK_NFTS.find(
     (n) =>
-      n.contractAddress.toLowerCase() === params.contract.toLowerCase() &&
-      n.tokenId === params.tokenId
+      n.contractAddress.toLowerCase() === contract.toLowerCase() &&
+      n.tokenId === tokenId
   )
 
   const { address } = useAccount()
