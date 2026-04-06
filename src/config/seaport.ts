@@ -13,6 +13,10 @@ export const CONDUIT_KEY =
 export const FEE_RECIPIENT = '0x0000a26b00c1F0DF003000390027140000fAa719' as const
 export const OPENSEA_FEE_BPS = 250
 
+/** WETH address on Tempo — update when mainnet contract is deployed */
+export const WETH_ADDRESS = (process.env.NEXT_PUBLIC_WETH_ADDRESS ||
+  '0x4200000000000000000000000000000000000006') as `0x${string}`
+
 export enum ItemType {
   NATIVE = 0,
   ERC20 = 1,

@@ -1,4 +1,4 @@
-import { NFT, Collection, MarketplaceStats } from '@/types'
+import { NFT, Collection, MarketplaceStats, Offer } from '@/types'
 
 export const MOCK_COLLECTIONS: Collection[] = [
   {
@@ -47,6 +47,66 @@ export const MOCK_COLLECTIONS: Collection[] = [
   },
 ]
 
+const MOCK_OFFER_PROTO: Omit<Offer, 'orderId' | 'price' | 'offeror' | 'expiration' | 'createdAt'> = {
+  currency: 'WETH',
+  currencyAddress: '0x4200000000000000000000000000000000000006',
+  status: 'active',
+  protocolData: {
+    parameters: {
+      offerer: '0xAAAA000000000000000000000000000000000001',
+      zone: '0x004C00500000aD104D7DBd00e3ae0A5C00560C00',
+      offer: [],
+      consideration: [],
+      orderType: 0,
+      startTime: Math.floor(Date.now() / 1000) - 600,
+      endTime: Math.floor(Date.now() / 1000) + 86400 * 7,
+      zoneHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+      salt: '0xdeadbeef',
+      conduitKey: '0x0000007b02230091a7ed01230072f7006a004d60a8d4e71d599b8104250f0000',
+      totalOriginalConsiderationItems: 2,
+    },
+    signature: '0xoffersignature',
+  },
+}
+
+const MOCK_OFFERS_NFT1: Offer[] = [
+  {
+    ...MOCK_OFFER_PROTO,
+    orderId: '0xoffer001',
+    price: '0.42',
+    offeror: '0xAAAA000000000000000000000000000000000001',
+    expiration: Math.floor(Date.now() / 1000) + 86400 * 7,
+    createdAt: Math.floor(Date.now() / 1000) - 600,
+  },
+  {
+    ...MOCK_OFFER_PROTO,
+    orderId: '0xoffer002',
+    price: '0.38',
+    offeror: '0xBBBB000000000000000000000000000000000002',
+    expiration: Math.floor(Date.now() / 1000) + 86400 * 3,
+    createdAt: Math.floor(Date.now() / 1000) - 3600,
+  },
+  {
+    ...MOCK_OFFER_PROTO,
+    orderId: '0xoffer003',
+    price: '0.35',
+    offeror: '0xCCCC000000000000000000000000000000000003',
+    expiration: Math.floor(Date.now() / 1000) + 86400 * 1,
+    createdAt: Math.floor(Date.now() / 1000) - 7200,
+  },
+]
+
+const MOCK_OFFERS_NFT2: Offer[] = [
+  {
+    ...MOCK_OFFER_PROTO,
+    orderId: '0xoffer004',
+    price: '0.09',
+    offeror: '0xDDDD000000000000000000000000000000000004',
+    expiration: Math.floor(Date.now() / 1000) + 86400 * 5,
+    createdAt: Math.floor(Date.now() / 1000) - 1200,
+  },
+]
+
 export const MOCK_NFTS: NFT[] = [
   {
     tokenId: '1',
@@ -64,6 +124,7 @@ export const MOCK_NFTS: NFT[] = [
     owner: '0x1234567890123456789012345678901234567890',
     creator: '0xAbCdEf1234567890AbCdEf1234567890AbCdEf12',
     collection: MOCK_COLLECTIONS[0],
+    offers: MOCK_OFFERS_NFT1,
     listing: {
       orderId: '0xabc123',
       price: '0.5',
@@ -160,6 +221,7 @@ export const MOCK_NFTS: NFT[] = [
     owner: '0x9999999999999999999999999999999999999999',
     creator: '0xAbCdEf1234567890AbCdEf1234567890AbCdEf12',
     collection: MOCK_COLLECTIONS[1],
+    offers: MOCK_OFFERS_NFT2,
     listing: {
       orderId: '0xghi789',
       price: '0.08',

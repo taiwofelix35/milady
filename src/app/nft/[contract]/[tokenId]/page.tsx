@@ -7,6 +7,8 @@ import Link from 'next/link'
 import { useAccount } from 'wagmi'
 import BuyModal from '@/components/BuyModal'
 import ListingModal from '@/components/ListingModal'
+import MakeOfferModal from '@/components/MakeOfferModal'
+import OffersTable from '@/components/OffersTable'
 import { MOCK_NFTS } from '@/lib/mockData'
 import { shortenAddress } from '@/lib/seaport'
 
@@ -25,6 +27,7 @@ export default function NFTDetailPage({ params }: PageProps) {
   const { address } = useAccount()
   const [showBuy, setShowBuy] = useState(false)
   const [showList, setShowList] = useState(false)
+  const [showOffer, setShowOffer] = useState(false)
 
   if (!nft) notFound()
 
@@ -136,6 +139,43 @@ export default function NFTDetailPage({ params }: PageProps) {
                 )}
               </>
             )}
+
+            {/* Make Offer — visible to non-owners whenever not already the seller */}
+            {!isOwner && (
+              <button
+                onClick={() => setShowOffer(true)}
+                className="mt-3 w-full py-3 bg-white text-milady-pink-dark font-semibold rounded-full border border-milady-pink hover:bg-milady-pink-light transition-colors shadow-milady"
+              >
+                Make Offer 💌
+              </button>
+            )}
+          </div>
+
+          {/* Offers Section */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-gray-700">Offers</h3>
+                {(nft.offers?.filter(
+                  (o) => o.status === 'active' && o.expiration > Math.floor(Date.now() / 1000)
+                ).length ?? 0) > 0 && (
+                  <span className="px-2 py-0.5 bg-milady-pink text-white text-xs font-medium rounded-full">
+                    {nft.offers!.filter(
+                      (o) => o.status === 'active' && o.expiration > Math.floor(Date.now() / 1000)
+                    ).length}
+                  </span>
+                )}
+              </div>
+              {!isOwner && (
+                <button
+                  onClick={() => setShowOffer(true)}
+                  className="text-xs text-milady-pink-dark hover:underline font-medium"
+                >
+                  + Make Offer
+                </button>
+              )}
+            </div>
+            <OffersTable nft={nft} />
           </div>
 
           {/* Description */}
@@ -201,6 +241,9 @@ export default function NFTDetailPage({ params }: PageProps) {
       )}
       {showList && (
         <ListingModal nft={nft} onClose={() => setShowList(false)} />
+      )}
+      {showOffer && (
+        <MakeOfferModal nft={nft} onClose={() => setShowOffer(false)} />
       )}
     </div>
   )

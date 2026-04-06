@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useAccount, useWriteContract } from 'wagmi'
 import { parseEther } from 'viem'
-import { SEAPORT_ABI } from '@/lib/seaport'
+import { SEAPORT_ABI, toFulfillOrderInput } from '@/lib/seaport'
 import { SEAPORT_ADDRESS, CONDUIT_KEY } from '@/config/seaport'
 import type { NFT } from '@/types'
 
@@ -32,16 +32,13 @@ export default function BuyModal({ nft, onClose }: BuyModalProps) {
       setStatus('pending')
       setErrorMsg('')
 
-      const order = {
-        parameters: nft.listing!.protocolData.parameters,
-        signature: nft.listing!.protocolData.signature as `0x${string}`,
-      }
+      const order = toFulfillOrderInput(nft.listing!.protocolData)
 
       await writeContractAsync({
         address: SEAPORT_ADDRESS,
         abi: SEAPORT_ABI,
         functionName: 'fulfillOrder',
-        args: [order as never, CONDUIT_KEY as `0x${string}`],
+        args: [order, CONDUIT_KEY as `0x${string}`],
         value: parseEther(nft.listing!.price),
       })
 

@@ -1,3 +1,15 @@
+export interface Offer {
+  orderId: string
+  price: string
+  currency: string
+  currencyAddress: string
+  offeror: string
+  expiration: number
+  createdAt: number
+  status: 'active' | 'accepted' | 'cancelled' | 'expired'
+  protocolData: SeaportOrder
+}
+
 export interface NFT {
   tokenId: string
   contractAddress: string
@@ -10,6 +22,7 @@ export interface NFT {
   creator: string
   collection: Collection
   listing?: Listing
+  offers?: Offer[]
   lastSale?: Sale
 }
 
