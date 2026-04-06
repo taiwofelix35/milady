@@ -1,0 +1,6 @@
+{
+  "devDependencies": {
+    "@nomicfoundation/hardhat-mocha": "^3.0.15",
+    "mocha": "^11.7.5"
+  }
+}

@@ -1,0 +1,17 @@
+# Hardhat artifacts & cache
+contracts/artifacts/
+contracts/cache/
+contracts/node_modules/
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+
+# Environment files
+.env
+.env.local
+*.env
+
+# OS
+.DS_Store

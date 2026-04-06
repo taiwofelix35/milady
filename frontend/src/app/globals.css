@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Raleway:wght@300;400;500;600;700&display=swap");
+
+:root {
+  --milady-pink: #ff69b4;
+  --milady-pink-light: #ffb6c1;
+  --milady-pink-dark: #c71585;
+  --milady-cream: #fff0f5;
+  --milady-charcoal: #1a1a2e;
+  --milady-charcoal-light: #16213e;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--milady-charcoal);
+  color: var(--milady-cream);
+  font-family: "Raleway", sans-serif;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--milady-charcoal);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--milady-pink-dark);
+  border-radius: 3px;
+}
+
+/* Selection highlight */
+::selection {
+  background: rgba(255, 105, 180, 0.3);
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-gradient-to-r from-milady-pink to-milady-pink-dark text-white font-semibold
+           px-6 py-2.5 rounded-xl shadow-glow hover:shadow-glow-sm hover:opacity-90
+           transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply border border-milady-pink text-milady-pink font-semibold
+           px-6 py-2.5 rounded-xl hover:bg-milady-pink/10
+           transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-ghost {
+    @apply text-milady-pink/70 font-medium px-4 py-2 rounded-lg
+           hover:text-milady-pink hover:bg-milady-pink/10 transition-all duration-200;
+  }
+
+  .card {
+    @apply bg-milady-charcoal-light border border-milady-pink/20 rounded-2xl
+           shadow-lg hover:border-milady-pink/40 transition-all duration-200;
+  }
+
+  .input {
+    @apply bg-milady-charcoal border border-milady-pink/30 text-milady-cream
+           rounded-xl px-4 py-2.5 w-full focus:outline-none focus:border-milady-pink
+           placeholder:text-milady-cream/30 transition-colors duration-200;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+           bg-milady-pink/20 text-milady-pink border border-milady-pink/30;
+  }
+
+  .section-title {
+    @apply text-2xl font-milady text-milady-cream mb-1;
+  }
+
+  .section-subtitle {
+    @apply text-milady-cream/60 text-sm mb-6;
+  }
+}
