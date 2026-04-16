@@ -1,0 +1,19 @@
+{
+  "name": "milady-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --max-old-space-size=6144 --watch src/server.js",
+    "start": "node --max-old-space-size=6144 src/server.js",
+    "rpc:bakeoff": "node scripts/rpcBakeoff.mjs",
+    "rpc:bakeoff:apply": "set RPC_BAKEOFF_WRITE_ENV=1&& node scripts/rpcBakeoff.mjs"
+  },
+  "dependencies": {
+    "@openzeppelin/merkle-tree": "^1.0.8",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "viem": "^2.38.3"
+  }
+}

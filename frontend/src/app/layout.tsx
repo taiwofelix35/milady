@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Navbar } from "@/components/Navbar";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 
 export const metadata: Metadata = {
   title: "Milady Marketplace – NFTs on Tempo",
   description: "Buy, sell, and make offers on Milady NFTs on the Tempo blockchain.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   openGraph: {
     title: "Milady Marketplace",
     description: "The premier NFT marketplace for Milady on Tempo network.",
@@ -30,10 +33,15 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-milady-charcoal text-milady-cream font-body">
         <Providers>
-          <Navbar />
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Suspense fallback={null}>
+            <Navbar />
+          </Suspense>
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-8">
             {children}
           </main>
+          <Suspense fallback={null}>
+            <MobileBottomNav />
+          </Suspense>
           <footer className="border-t border-milady-pink/10 mt-16 py-8 text-center text-milady-cream/40 text-sm">
             <p className="font-milady text-milady-pink/60 mb-1">✦ Milady Marketplace ✦</p>
             <p>Built on Tempo Network · Powered by love & pink</p>

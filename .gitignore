@@ -13,5 +13,9 @@ frontend/.env.local
 .env.local
 *.env
 
+# Backend persisted allowlist/merkle data
+backend/data/
+
 # OS
 .DS_Store
+node_modules

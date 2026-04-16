@@ -1,8 +1,10 @@
+import { formatUnits } from "viem";
+
 /**
  * Resolves an IPFS URI to an HTTP gateway URL.
  */
 export function resolveIPFS(uri: string): string {
-  if (!uri) return "/placeholder.png";
+  if (!uri) return "/placeholder.svg";
   if (uri.startsWith("ipfs://")) {
     return `https://ipfs.io/ipfs/${uri.slice(7)}`;
   }
@@ -34,6 +36,19 @@ export async function fetchMetadata(tokenURI: string): Promise<{
 export function formatEther(wei: bigint, decimals = 4): string {
   const value = Number(wei) / 1e18;
   return value.toFixed(decimals).replace(/\.?0+$/, "");
+}
+
+/**
+ * Formats token amounts with arbitrary decimals (e.g. 6 for pathUSD).
+ */
+export function formatTokenAmount(amount: bigint, tokenDecimals: number, displayDecimals = 4): string {
+  const full = formatUnits(amount, tokenDecimals);
+  const [intPart, fracPart = ""] = full.split(".");
+  if (displayDecimals <= 0 || fracPart.length === 0) {
+    return intPart;
+  }
+  const shortened = `${intPart}.${fracPart.slice(0, displayDecimals)}`;
+  return shortened.replace(/\.?0+$/, "");
 }
 
 /**

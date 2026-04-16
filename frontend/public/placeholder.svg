@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200" role="img" aria-label="Placeholder image">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#22101f"/>
+      <stop offset="100%" stop-color="#3d1a37"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f59ecf"/>
+      <stop offset="100%" stop-color="#ffc2e2"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="1200" fill="url(#bg)"/>
+  <circle cx="600" cy="600" r="310" fill="none" stroke="url(#ring)" stroke-width="20" opacity="0.7"/>
+  <circle cx="600" cy="600" r="180" fill="none" stroke="#f59ecf" stroke-width="10" opacity="0.45"/>
+  <text x="600" y="600" fill="#ffd7eb" font-family="Raleway, sans-serif" font-size="56" text-anchor="middle" dominant-baseline="middle" letter-spacing="3">
+    NO PREVIEW
+  </text>
+  <text x="600" y="668" fill="#f8b5da" font-family="Raleway, sans-serif" font-size="26" text-anchor="middle" dominant-baseline="middle" opacity="0.8">
+    METADATA IMAGE UNAVAILABLE
+  </text>
+</svg>

@@ -1,0 +1,12 @@
+{
+  "title": "Milady On Tempo Docs",
+  "items": [
+    { "label": "Overview", "path": "index.html" },
+    { "label": "Mint Guide", "path": "mint.html" },
+    { "label": "Marketplace Guide", "path": "marketplace.html" },
+    { "label": "How It Works", "path": "architecture.html" },
+    { "label": "Help Topics", "path": "api.html" },
+    { "label": "Roadmap", "path": "roadmap.html" },
+    { "label": "Docs Updates", "path": "deployment.html" }
+  ]
+}

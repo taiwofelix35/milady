@@ -1,37 +1,50 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { parseEther, zeroAddress } from "viem";
-import { useState } from "react";
-import { useTokenMetadata, useIsApprovedForMarketplace } from "@/hooks/useNFT";
+import { parseUnits } from "viem";
+import { useEffect, useState } from "react";
+import { fetchActivityByToken, fetchListingByToken, fetchRarityRanks } from "@/lib/backendApi";
+import { useTokenMetadata, useIsApprovedForMarketplaceByContracts } from "@/hooks/useNFT";
 import { MILADY_NFT_ABI, MILADY_MARKETPLACE_ABI } from "@/lib/abis";
-import { NFT_CONTRACT_ADDRESS, MARKETPLACE_CONTRACT_ADDRESS } from "@/lib/chain";
-import { resolveIPFS, formatEther, shortAddress } from "@/lib/utils";
+import {
+  NFT_CONTRACT_ADDRESS,
+  MARKETPLACE_CONTRACT_ADDRESS,
+  PAYMENT_TOKEN_DECIMALS,
+  PAYMENT_TOKEN_ADDRESS,
+  PAYMENT_TOKEN_SYMBOL,
+} from "@/lib/chain";
+import { getSelectedCollectionSlug, saveSelectedCollectionSlug } from "@/lib/collectionContext";
+import { getRarityResult, type RarityResult } from "@/lib/rarity";
+import { resolveIPFS, formatTokenAmount, shortAddress } from "@/lib/utils";
 import { useReadContract } from "wagmi";
+import { getCollectionBySlug, tokenImageFromTemplate } from "@/lib/collections";
 
 // ─── Sub-component: Buy panel ───────────────────────────────────────────────
 function BuyPanel({
-  listingId,
+  tokenId,
   price,
-  paymentToken,
+  nftContract,
+  marketplaceContract,
+  listingSource,
 }: {
-  listingId: `0x${string}`;
+  tokenId: bigint;
   price: bigint;
-  paymentToken: string;
+  nftContract: `0x${string}`;
+  marketplaceContract: `0x${string}`;
+  listingSource?: string | null;
 }) {
-  const isNative = paymentToken === zeroAddress;
   const { writeContract, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   function handleBuy() {
     writeContract({
-      address: MARKETPLACE_CONTRACT_ADDRESS,
+      address: marketplaceContract,
       abi: MILADY_MARKETPLACE_ABI,
-      functionName: "buy",
-      args: [listingId],
-      value: isNative ? price : 0n,
+      functionName: "buyListing",
+      args: [nftContract, tokenId],
     });
   }
 
@@ -39,32 +52,67 @@ function BuyPanel({
     return <p className="text-green-400 font-semibold">✓ Purchase complete!</p>;
   }
 
+  const source = listingSource ?? "milady";
+  const isExternalSource = source !== "milady";
+  const externalUrl = source === "stablewhel"
+    ? "https://www.stablewhel.xyz"
+    : source === "temppunks"
+      ? "https://temppunks.com"
+      : null;
+
   return (
     <div className="space-y-3">
+      {isExternalSource && (
+        <p className="text-yellow-300/90 text-xs">
+          This listing is active on {source === "stablewhel" ? "StableWhel" : "TempPunks"}. Buy from that marketplace.
+        </p>
+      )}
       <p className="text-milady-cream/60 text-sm">
         Price:{" "}
         <span className="text-milady-pink font-bold text-lg">
-          {formatEther(price)} {isNative ? "TEMPO" : shortAddress(paymentToken)}
+          {formatTokenAmount(price, PAYMENT_TOKEN_DECIMALS)} {PAYMENT_TOKEN_SYMBOL}
         </span>
       </p>
-      <button
-        onClick={handleBuy}
-        disabled={isPending || isConfirming}
-        className="btn-primary w-full"
-      >
-        {isPending || isConfirming ? "Processing…" : "Buy Now"}
-      </button>
+      {isExternalSource && externalUrl ? (
+        <a
+          href={externalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-primary w-full inline-flex items-center justify-center"
+        >
+          Open {source === "stablewhel" ? "StableWhel" : "TempPunks"}
+        </a>
+      ) : (
+        <button
+          onClick={handleBuy}
+          disabled={isPending || isConfirming}
+          className="btn-primary w-full"
+        >
+          {isPending || isConfirming ? "Processing…" : "Buy Now"}
+        </button>
+      )}
     </div>
   );
 }
 
 // ─── Sub-component: List panel ───────────────────────────────────────────────
-function ListPanel({ tokenId }: { tokenId: bigint }) {
+function ListPanel({
+  tokenId,
+  nftContract,
+  marketplaceContract,
+}: {
+  tokenId: bigint;
+  nftContract: `0x${string}`;
+  marketplaceContract: `0x${string}`;
+}) {
   const { address } = useAccount();
   const [price, setPrice] = useState("");
-  const [expiry, setExpiry] = useState("");
 
-  const { data: isApproved, refetch: refetchApproval } = useIsApprovedForMarketplace(address);
+  const { data: isApproved, refetch: refetchApproval } = useIsApprovedForMarketplaceByContracts(
+    address,
+    nftContract,
+    marketplaceContract
+  );
   const { writeContract: approve, data: approveHash, isPending: approving } = useWriteContract();
   const { writeContract: list, data: listHash, isPending: listing } = useWriteContract();
   const { isLoading: approvingConfirm, isSuccess: approveSuccess } = useWaitForTransactionReceipt({
@@ -76,30 +124,25 @@ function ListPanel({ tokenId }: { tokenId: bigint }) {
 
   if (approveSuccess) refetchApproval();
 
-  const expiryTimestamp =
-    expiry ? BigInt(Math.floor(new Date(expiry).getTime() / 1000)) : 0n;
-
   function handleApprove() {
     approve({
-      address: NFT_CONTRACT_ADDRESS,
+      address: nftContract,
       abi: MILADY_NFT_ABI,
       functionName: "setApprovalForAll",
-      args: [MARKETPLACE_CONTRACT_ADDRESS, true],
+      args: [marketplaceContract, true],
     });
   }
 
   function handleList() {
     if (!price) return;
     list({
-      address: MARKETPLACE_CONTRACT_ADDRESS,
+      address: marketplaceContract,
       abi: MILADY_MARKETPLACE_ABI,
-      functionName: "list",
+      functionName: "createListing",
       args: [
-        NFT_CONTRACT_ADDRESS,
+        nftContract,
         tokenId,
-        parseEther(price),
-        zeroAddress,
-        expiryTimestamp,
+        parseUnits(price, PAYMENT_TOKEN_DECIMALS),
       ],
     });
   }
@@ -129,19 +172,12 @@ function ListPanel({ tokenId }: { tokenId: bigint }) {
     <div className="space-y-3">
       <input
         type="number"
-        placeholder="Price in TEMPO"
+        placeholder={`Price in ${PAYMENT_TOKEN_SYMBOL}`}
         value={price}
         onChange={(e) => setPrice(e.target.value)}
         className="input"
         min="0"
         step="0.001"
-      />
-      <input
-        type="datetime-local"
-        value={expiry}
-        onChange={(e) => setExpiry(e.target.value)}
-        className="input text-sm"
-        title="Optional expiry date"
       />
       <button
         onClick={handleList}
@@ -154,32 +190,69 @@ function ListPanel({ tokenId }: { tokenId: bigint }) {
   );
 }
 
+function CancelListingPanel({
+  tokenId,
+  nftContract,
+  marketplaceContract,
+}: {
+  tokenId: bigint;
+  nftContract: `0x${string}`;
+  marketplaceContract: `0x${string}`;
+}) {
+  const { writeContract, data: hash, isPending } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  if (isSuccess) {
+    return <p className="text-green-400 font-semibold">✓ Listing cancelled.</p>;
+  }
+
+  return (
+    <button
+      onClick={() => {
+        writeContract({
+          address: marketplaceContract,
+          abi: MILADY_MARKETPLACE_ABI,
+          functionName: "cancelListing",
+          args: [nftContract, tokenId],
+        });
+      }}
+      disabled={isPending || isConfirming}
+      className="btn-secondary w-full"
+    >
+      {isPending || isConfirming ? "Cancelling…" : "Cancel Listing"}
+    </button>
+  );
+}
+
 // ─── Sub-component: Make Offer panel ─────────────────────────────────────────
-function MakeOfferPanel({ tokenId }: { tokenId: bigint }) {
+function MakeOfferPanel({
+  tokenId,
+  nftContract,
+  marketplaceContract,
+}: {
+  tokenId: bigint;
+  nftContract: `0x${string}`;
+  marketplaceContract: `0x${string}`;
+}) {
   const [amount, setAmount] = useState("");
-  const [expiry, setExpiry] = useState("");
+  const [durationHours, setDurationHours] = useState("24");
 
   const { writeContract, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const expiryTimestamp =
-    expiry ? BigInt(Math.floor(new Date(expiry).getTime() / 1000)) : 0n;
-
-  // Uses a well-known WETH address (update per network); falls back to zero for native
-  const WETH = (process.env.NEXT_PUBLIC_WETH_ADDRESS ?? zeroAddress) as `0x${string}`;
+  const durationSeconds = BigInt(Math.max(1, Number(durationHours || "0")) * 3600);
 
   function handleOffer() {
     if (!amount) return;
     writeContract({
-      address: MARKETPLACE_CONTRACT_ADDRESS,
+      address: marketplaceContract,
       abi: MILADY_MARKETPLACE_ABI,
       functionName: "makeOffer",
       args: [
-        NFT_CONTRACT_ADDRESS,
+        nftContract,
         tokenId,
-        parseEther(amount),
-        WETH,
-        expiryTimestamp,
+        parseUnits(amount, PAYMENT_TOKEN_DECIMALS),
+        durationSeconds,
       ],
     });
   }
@@ -191,11 +264,11 @@ function MakeOfferPanel({ tokenId }: { tokenId: bigint }) {
   return (
     <div className="space-y-3">
       <p className="text-milady-cream/50 text-xs">
-        Offer uses WETH. Make sure you have enough WETH approved for the marketplace.
+        Offers are made in {PAYMENT_TOKEN_SYMBOL} token ({PAYMENT_TOKEN_ADDRESS}) configured in your marketplace contract.
       </p>
       <input
         type="number"
-        placeholder="Offer amount in WETH"
+        placeholder={`Offer amount in ${PAYMENT_TOKEN_SYMBOL}`}
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
         className="input"
@@ -203,11 +276,13 @@ function MakeOfferPanel({ tokenId }: { tokenId: bigint }) {
         step="0.001"
       />
       <input
-        type="datetime-local"
-        value={expiry}
-        onChange={(e) => setExpiry(e.target.value)}
-        className="input text-sm"
-        title="Optional offer expiry"
+        type="number"
+        placeholder="Offer duration (hours)"
+        value={durationHours}
+        onChange={(e) => setDurationHours(e.target.value)}
+        className="input"
+        min="1"
+        step="1"
       />
       <button
         onClick={handleOffer}
@@ -223,23 +298,194 @@ function MakeOfferPanel({ tokenId }: { tokenId: bigint }) {
 // ─── Main NFT Detail page ─────────────────────────────────────────────────────
 export default function NFTDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const tokenId = BigInt(params.tokenId as string);
   const { address } = useAccount();
+  const [resolvedCollectionSlug, setResolvedCollectionSlug] = useState("");
+  const collectionSlug = searchParams.get("collection") ?? resolvedCollectionSlug;
+  const selectedCollection = getCollectionBySlug(collectionSlug);
+  const activeNftContract = selectedCollection?.nftContract ?? NFT_CONTRACT_ADDRESS;
+  const activeMarketplaceContract = selectedCollection?.marketContract ?? MARKETPLACE_CONTRACT_ADDRESS;
 
-  const { metadata, loading } = useTokenMetadata(tokenId);
+  useEffect(() => {
+    const fromQuery = searchParams.get("collection") ?? "";
+    const fallback = getSelectedCollectionSlug();
+    const slug = fromQuery || fallback;
+    setResolvedCollectionSlug(slug);
+    if (slug) {
+      saveSelectedCollectionSlug(slug);
+    }
+  }, [searchParams]);
+
+  const { metadata, loading } = useTokenMetadata(tokenId, activeNftContract);
 
   const { data: owner } = useReadContract({
-    address: NFT_CONTRACT_ADDRESS,
+    address: activeNftContract,
     abi: MILADY_NFT_ABI,
     functionName: "ownerOf",
     args: [tokenId],
   });
 
   const isOwner = address && owner && address.toLowerCase() === (owner as string).toLowerCase();
-  const imageSrc = metadata?.image ? resolveIPFS(metadata.image) : "/placeholder.png";
-  const displayName = metadata?.name ?? `Milady #${tokenId.toString()}`;
+  const imageSrc = metadata?.image
+    ? resolveIPFS(metadata.image)
+    : selectedCollection
+      ? tokenImageFromTemplate(selectedCollection, tokenId)
+      : "/placeholder.svg";
+  const isRemoteImage = imageSrc.startsWith("http://") || imageSrc.startsWith("https://");
+  const displayName = metadata?.name ?? `${selectedCollection?.name ?? "NFT"} #${tokenId.toString()}`;
+  const [listing, setListing] = useState<
+    | {
+        seller: `0x${string}`;
+        price: bigint;
+        active: boolean;
+        source?: string | null;
+        sourceLabel?: string | null;
+      }
+    | null
+  >(null);
+  const [listingLoading, setListingLoading] = useState(true);
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [rarityLoading, setRarityLoading] = useState(false);
+  const [rarity, setRarity] = useState<RarityResult | null>(null);
+  const [rarityRank, setRarityRank] = useState<number | null>(null);
+  const [rarityRankedTotal, setRarityRankedTotal] = useState<number | null>(null);
+  const [activity, setActivity] = useState<
+    Array<{
+      type: "ItemListed" | "ItemSold" | "OfferMade";
+      source?: string;
+      sourceLabel?: string;
+      marketplace?: `0x${string}`;
+      blockNumber: string | null;
+      transactionHash: `0x${string}` | null;
+      seller?: `0x${string}`;
+      buyer?: `0x${string}`;
+      offerer?: `0x${string}`;
+      price?: string;
+      expiry?: string;
+    }>
+  >([]);
+  const [activityFilter, setActivityFilter] = useState<"all" | "ItemListed" | "ItemSold" | "OfferMade">("all");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadListing() {
+      setListingLoading(true);
+      const nextListing = await fetchListingByToken(
+        tokenId,
+        activeNftContract,
+        selectedCollection?.marketContract
+      );
+      if (!cancelled) {
+        setListing(nextListing);
+        setListingLoading(false);
+      }
+    }
+
+    loadListing();
+    const intervalId = window.setInterval(loadListing, 20_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [tokenId, activeNftContract, selectedCollection?.marketContract]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRarity() {
+      if (!selectedCollection?.metadataBase || !metadata?.attributes?.length) {
+        setRarity(null);
+        return;
+      }
+
+      setRarityLoading(true);
+      const result = await getRarityResult({
+        collectionSlug: selectedCollection.slug,
+        metadataBase: selectedCollection.metadataBase,
+        supply: selectedCollection.supply,
+        attributes: metadata.attributes,
+      });
+
+      if (!cancelled) {
+        setRarity(result);
+        setRarityLoading(false);
+      }
+    }
+
+    loadRarity();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCollection?.slug, selectedCollection?.metadataBase, selectedCollection?.supply, metadata?.attributes]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRarityRank() {
+      if (!selectedCollection?.metadataBase || selectedCollection.supply <= 0) {
+        setRarityRank(null);
+        setRarityRankedTotal(null);
+        return;
+      }
+
+      const response = await fetchRarityRanks({
+        metadataBase: selectedCollection.metadataBase,
+        supply: selectedCollection.supply,
+        startTokenId: selectedCollection.startTokenId ?? 1,
+        tokenIds: [tokenId],
+      });
+
+      if (!cancelled) {
+        const row = response?.ranksByToken.get(tokenId.toString());
+        setRarityRank(row?.rank ?? null);
+        setRarityRankedTotal(response?.rankedTokens ?? null);
+      }
+    }
+
+    void loadRarityRank();
+    return () => {
+      cancelled = true;
+    };
+  }, [tokenId, selectedCollection?.metadataBase, selectedCollection?.supply, selectedCollection?.startTokenId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadActivity() {
+      setActivityLoading(true);
+      const events = await fetchActivityByToken(tokenId, activeNftContract);
+      if (!cancelled) {
+        setActivity(events);
+        setActivityLoading(false);
+      }
+    }
+
+    loadActivity();
+    const intervalId = window.setInterval(loadActivity, 20_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [tokenId, activeNftContract]);
+
+  const hasActiveListing = !!listing && listing.active;
 
   const [activeTab, setActiveTab] = useState<"buy" | "offer" | "list">("buy");
+
+  useEffect(() => {
+    const requested = searchParams.get("tab");
+    if (requested === "list" || requested === "offer" || requested === "buy") {
+      setActiveTab(requested);
+    }
+  }, [searchParams]);
+  const filteredActivity =
+    activityFilter === "all"
+      ? activity
+      : activity.filter((event) => event.type === activityFilter);
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -255,7 +501,7 @@ export default function NFTDetailPage() {
                 alt={displayName}
                 fill
                 className="object-cover"
-                unoptimized={imageSrc.startsWith("https://ipfs.io")}
+                unoptimized={isRemoteImage}
               />
             )}
           </div>
@@ -277,18 +523,63 @@ export default function NFTDetailPage() {
               </div>
             </div>
           )}
+
+          <div className="card p-4">
+            <h3 className="text-sm font-semibold text-milady-pink mb-3">Rarity</h3>
+            {rarityLoading ? (
+              <p className="text-milady-cream/50 text-sm">Computing rarity from collection metadata...</p>
+            ) : !rarity ? (
+              <p className="text-milady-cream/50 text-sm">
+                Rarity unavailable for this NFT. Add metadata base to the collection to enable scoring.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {typeof rarityRank === "number" && rarityRank > 0 && (
+                  <p className="text-milady-cream text-sm">
+                    Rank: <span className="text-milady-pink font-semibold">#{rarityRank}</span>
+                    {typeof rarityRankedTotal === "number" && rarityRankedTotal > 0 ? ` / ${rarityRankedTotal}` : ""}
+                  </p>
+                )}
+                <p className="text-milady-cream text-sm">
+                  Score: <span className="text-milady-pink font-semibold">{rarity.score.toFixed(2)}</span>
+                </p>
+                <p className="text-milady-cream/50 text-xs">Based on {rarity.sampledTokens} sampled tokens.</p>
+                <div className="space-y-2">
+                  {rarity.traits.map((row) => (
+                    <div
+                      key={`${row.traitType}:${row.value}`}
+                      className="flex items-center justify-between gap-3 text-xs border border-milady-pink/10 rounded-md px-2 py-1"
+                    >
+                      <span className="text-milady-cream/70 truncate">{row.traitType}: {row.value}</span>
+                      <span className="text-milady-pink whitespace-nowrap">{(row.frequency * 100).toFixed(2)}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right: Details & actions */}
         <div className="space-y-6">
           <div>
-            <p className="text-milady-pink/60 text-sm font-medium mb-1">Milady NFT</p>
+            <p className="text-milady-pink/60 text-sm font-medium mb-1">
+              {selectedCollection?.name ?? "Milady"} NFT
+            </p>
+            {selectedCollection && (
+              <Link
+                href={`/collection/${selectedCollection.slug}`}
+                className="inline-block text-xs px-2 py-1 rounded-md border border-milady-pink/30 text-milady-pink hover:bg-milady-pink/10 mb-2"
+              >
+                {selectedCollection.name}
+              </Link>
+            )}
             <h1 className="font-milady text-3xl text-milady-cream">{displayName}</h1>
             {owner && (
               <p className="text-milady-cream/50 text-sm mt-2">
                 Owned by{" "}
                 <a
-                  href={`/profile/${owner}`}
+                  href={`/profile/${owner}${selectedCollection ? `?collection=${selectedCollection.slug}` : ""}`}
                   className="text-milady-pink hover:underline"
                 >
                   {isOwner ? "You" : shortAddress(owner as string)}
@@ -339,22 +630,125 @@ export default function NFTDetailPage() {
               )}
             </div>
 
-            {activeTab === "buy" && (
-              <p className="text-milady-cream/50 text-sm">
-                No active listing. Check back later or make an offer.
-              </p>
-            )}
+            {activeTab === "buy" &&
+              (hasActiveListing ? (
+                <BuyPanel
+                  tokenId={tokenId}
+                  price={listing.price}
+                  nftContract={activeNftContract}
+                  marketplaceContract={activeMarketplaceContract}
+                  listingSource={listing.source}
+                />
+              ) : listingLoading ? (
+                <p className="text-milady-cream/50 text-sm">Loading listing data from backend...</p>
+              ) : (
+                <p className="text-milady-cream/50 text-sm">
+                  No active listing found for this NFT.
+                </p>
+              ))}
 
             {activeTab === "offer" && (
               address ? (
-                <MakeOfferPanel tokenId={tokenId} />
+                <MakeOfferPanel
+                  tokenId={tokenId}
+                  nftContract={activeNftContract}
+                  marketplaceContract={activeMarketplaceContract}
+                />
               ) : (
                 <p className="text-milady-cream/50 text-sm">Connect your wallet to make an offer.</p>
               )
             )}
 
             {activeTab === "list" && isOwner && (
-              <ListPanel tokenId={tokenId} />
+              listingLoading ? (
+                <p className="text-milady-cream/50 text-sm">Loading listing data from backend...</p>
+              ) : hasActiveListing ? (
+                listing.source && listing.source !== "milady" ? (
+                  <p className="text-milady-cream/50 text-sm">
+                    This listing is from {listing.sourceLabel ?? listing.source}. Cancel it on that marketplace.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-milady-cream/60 text-sm">
+                      Current listing: <span className="text-milady-pink font-semibold">{formatTokenAmount(listing.price, PAYMENT_TOKEN_DECIMALS)} {PAYMENT_TOKEN_SYMBOL}</span>
+                    </p>
+                    <CancelListingPanel
+                      tokenId={tokenId}
+                      nftContract={activeNftContract}
+                      marketplaceContract={activeMarketplaceContract}
+                    />
+                  </div>
+                )
+              ) : (
+                <ListPanel
+                  tokenId={tokenId}
+                  nftContract={activeNftContract}
+                  marketplaceContract={activeMarketplaceContract}
+                />
+              )
+            )}
+          </div>
+
+          <div className="card p-5 space-y-4">
+            <h3 className="text-sm font-semibold text-milady-pink">Activity</h3>
+            <div className="flex flex-wrap gap-2">
+              {[
+                ["all", "All"],
+                ["ItemListed", "Listings"],
+                ["ItemSold", "Sales"],
+                ["OfferMade", "Offers"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  onClick={() => setActivityFilter(value as "all" | "ItemListed" | "ItemSold" | "OfferMade")}
+                  className={`text-xs px-2 py-1 rounded-md border transition-colors ${
+                    activityFilter === value
+                      ? "border-milady-pink text-milady-pink bg-milady-pink/10"
+                      : "border-milady-pink/20 text-milady-cream/60 hover:text-milady-cream"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {activityLoading ? (
+              <p className="text-milady-cream/50 text-sm">Loading activity from backend...</p>
+            ) : filteredActivity.length === 0 ? (
+              <p className="text-milady-cream/50 text-sm">No activity found for this NFT yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {filteredActivity.map((event, idx) => (
+                  <div key={`${event.transactionHash}-${idx}`} className="rounded-lg border border-milady-pink/10 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <p className="text-milady-cream text-sm font-medium">{event.type}</p>
+                        {event.sourceLabel && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full border border-milady-pink/25 text-milady-pink">
+                            {event.sourceLabel}
+                          </span>
+                        )}
+                      </div>
+                      {event.price && (
+                        <p className="text-milady-pink text-sm font-semibold">{formatTokenAmount(BigInt(event.price), PAYMENT_TOKEN_DECIMALS)} {PAYMENT_TOKEN_SYMBOL}</p>
+                      )}
+                    </div>
+                    <p className="text-milady-cream/50 text-xs mt-1">Block: {event.blockNumber ?? "-"}</p>
+                    <div className="text-milady-cream/60 text-xs mt-2 space-y-1">
+                      {event.seller && <p>Seller: {shortAddress(event.seller)}</p>}
+                      {event.buyer && <p>Buyer: {shortAddress(event.buyer)}</p>}
+                      {event.offerer && <p>Offerer: {shortAddress(event.offerer)}</p>}
+                    </div>
+                    <a
+                      href={`https://explore.tempo.xyz/tx/${event.transactionHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-milady-pink text-xs hover:underline mt-2 inline-block"
+                    >
+                      View transaction
+                    </a>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>
